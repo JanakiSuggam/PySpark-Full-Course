@@ -1,0 +1,27 @@
+                +-------------------+
+                |   Driver Program  |
+                +-------------------+
+                         |
+     Instructs: Read CSV File
+                         |
+       +--------------------------------+
+       | Distributed File Storage (HDFS|
+       | / S3, etc.)                   |
+       | Splits file into 4 blocks     |
+       +--------------------------------+
+                         |
+          Each block becomes a partition
+                         |
+            +----------------------------+
+            |        Cluster             |
+            +----------------------------+
+      Executor 1           Executor 2
+     [4 cores]             [4 cores]
+     Task 0 → Partition 0  Task 2 → Partition 2
+     Task 1 → Partition 1  Task 3 → Partition 3
+                         |
+              Each task counts rows
+                         |
+                  Driver adds totals
+                         |
+                    Final Count = 80
