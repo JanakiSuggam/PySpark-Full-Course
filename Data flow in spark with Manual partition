@@ -1,0 +1,56 @@
+                    ┌──────────────────────────────┐
+                    │          Your Code           │
+                    │                              │
+                    │ df = spark.read.csv(...)     │
+                    │ df = df.repartition(8)       │
+                    │ df.count()                   │
+                    └────────────┬─────────────────┘
+                                 │
+                   ┌────────────▼────────────┐
+                   │        Driver           │
+                   │ (Plans job, creates DAG│
+                   │  and schedules tasks)  │
+                   └────────────┬────────────┘
+                                │
+            ┌───────────────────▼─────────────────────┐
+            │            Distributed Storage          │
+            │         (HDFS / S3 / etc.)              │
+            │  • Splits file into 4 blocks → 4 partitions
+            └───────────────────┬─────────────────────┘
+                                │
+        ┌───────────────────────▼─────────────────────────┐
+        │        Step 1: Read data into 4 partitions       │
+        │    (each partition becomes 1 task initially)     │
+        └───────────────────────┬─────────────────────────┘
+                                │
+        ┌───────────────────────▼─────────────────────────┐
+        │     Step 2: repartition(8) triggers shuffle      │
+        │    • Spark redistributes the data across 8       │
+        │      new partitions (may involve all executors)  │
+        └───────────────────────┬─────────────────────────┘
+                                │
+        ┌───────────────────────▼─────────────────────────┐
+        │        Step 3: 8 Tasks Now Assigned              │
+        └───────────────────────┬─────────────────────────┘
+                                │
+      ┌─────────────────────────▼────────────────────────────┐
+      │                        Executors                      │
+      └─────────────────────────┬────────────────────────────┘
+                                │
+      ┌─────────────────────────▼────────────────────────────┐
+      │ Executor 1              │ Executor 2                  │
+      │  (4 cores)              │  (4 cores)                  │
+      │ Task 0  → Partition 0   │ Task 4 → Partition 4        │
+      │ Task 1  → Partition 1   │ Task 5 → Partition 5        │
+      │ Task 2  → Partition 2   │ Task 6 → Partition 6        │
+      │ Task 3  → Partition 3   │ Task 7 → Partition 7        │
+      └─────────────────────────┴────────────────────────────┘
+                                │
+                 Each executor processes 4 partitions
+                                │
+                   ┌────────────▼────────────┐
+                   │        Driver           │
+                   │ Aggregates results      │
+                   └────────────┬────────────┘
+                                │
+                    Final Output Returned
